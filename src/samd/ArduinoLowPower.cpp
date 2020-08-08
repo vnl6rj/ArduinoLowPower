@@ -37,13 +37,6 @@ void ArduinoLowPowerClass::idle(uint32_t millis) {
 }
 
 void ArduinoLowPowerClass::sleep() {
-	bool restoreUSBDevice = false;
-	if (SERIAL_PORT_USBVIRTUAL) {
-		USBDevice.standby();
-	} else {
-		USBDevice.detach();
-		restoreUSBDevice = true;
-	}
 	// Disable systick interrupt:  See https://www.avrfreaks.net/forum/samd21-samd21e16b-sporadically-locks-and-does-not-wake-standby-sleep-mode
 	SysTick->CTRL &= ~SysTick_CTRL_TICKINT_Msk;	
 	SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
@@ -51,9 +44,6 @@ void ArduinoLowPowerClass::sleep() {
 	__WFI();
 	// Enable systick interrupt
 	SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk;	
-	if (restoreUSBDevice) {
-		USBDevice.attach();
-	}
 }
 
 void ArduinoLowPowerClass::sleep(uint32_t millis) {
@@ -212,6 +202,24 @@ void ADC_Handler()
 	// Clear the interrupt flag
 	ADC->INTFLAG.bit.WINMON = 1;
 	LowPower.adc_cb();
+}
+
+void ArduinoLowPowerClass::wakeOnWire(TwoWire * wire, bool intEnable) {
+	wire->sercom->disableWIRE();
+	wire->sercom->sercom->I2CS.CTRLA.bit.RUNSTDBY = intEnable ;
+	wire->sercom->enableWIRE();
+}
+
+void ArduinoLowPowerClass::wakeOnSPI(SPIClass * spi, bool intEnable) {
+	spi->_p_sercom->disableSPI();
+	spi->_p_sercom->sercom->SPI.CTRLA.bit.RUNSTDBY = intEnable ;
+	spi->_p_sercom->enableSPI();
+}
+
+void ArduinoLowPowerClass::wakeOnSerial(Uart * uart, bool intEnable) {
+	uart->sercom->disableUART();
+	uart->sercom->sercom->USART.CTRLA.bit.RUNSTDBY = intEnable ;
+	uart->sercom->enableUART();
 }
 
 ArduinoLowPowerClass LowPower;
