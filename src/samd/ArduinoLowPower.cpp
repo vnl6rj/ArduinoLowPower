@@ -3,6 +3,7 @@
 #include "ArduinoLowPower.h"
 #include "WInterrupts.h"
 
+#if (SAMD21)
 static void configGCLK6()
 {
 	// enable EIC clock
@@ -23,12 +24,17 @@ static void configGCLK6()
 
 	NVMCTRL->CTRLB.bit.SLEEPPRM = NVMCTRL_CTRLB_SLEEPPRM_DISABLED_Val;
 }
-
+#endif
 void ArduinoLowPowerClass::idle() {
 	SCB->SCR &= ~SCB_SCR_SLEEPDEEP_Msk;
+	#if (SAMD21)
 	PM->SLEEP.reg = 2;
+	#elif (SAMR34)
+    PM->SLEEPCFG.reg = PM_SLEEPCFG_SLEEPMODE_IDLE;
+	#endif
 	__DSB();
 	__WFI();
+	
 }
 
 void ArduinoLowPowerClass::idle(uint32_t millis) {
@@ -84,19 +90,34 @@ void ArduinoLowPowerClass::attachInterruptWakeup(uint32_t pin, voidFuncPtr callb
 		return;
 	}
 
-	EExt_Interrupts in = g_APinDescription[pin].ulExtInt;
+	uint8_t in = g_APinDescription[pin].ulExtInt; 
 	if (in == NOT_AN_INTERRUPT || in == EXTERNAL_INT_NMI)
     		return;
 
 	//pinMode(pin, INPUT_PULLUP);
 	attachInterrupt(pin, callback, mode);
-
+    #if (SAMD21)
 	configGCLK6();
+	#endif
 
+    #if (SAMD21)
 	// Enable wakeup capability on pin in case being used during sleep
 	EIC->WAKEUP.reg |= (1 << in);
+    #elif (SAMR34)
+    // Enable wakeup capability on pin in case being used during sleep
+	EIC->CTRLA.bit.CKSEL = 1; // use ULP32k as source ( SAML21 is different to D21 series, EIC can be set to use ULP32k without GCLK )
+    // Enable EIC
+	EIC->CTRLA.bit.ENABLE = 1;
+    while (EIC->SYNCBUSY.bit.ENABLE == 1) { /*wait for sync*/ }
+
+	/* Errata: Make sure that the Flash does not power all the way down
+     	* when in sleep mode. */
+ 	// NVMCTRL->CTRLB.bit.SLEEPPRM = NVMCTRL_CTRLB_SLEEPPRM_DISABLED_Val;
+	 NVMCTRL->CTRLB.bit.SLEEPPRM =  NVMCTRL_CTRLB_SLEEPPRM_WAKEUPINSTANT_Val;
+	 #endif
 }
 
+#if (SAMD21)
 void ArduinoLowPowerClass::attachAdcInterrupt(uint32_t pin, voidFuncPtr callback, adc_interrupt mode, uint16_t lo, uint16_t hi)
 {
 	uint8_t winmode = 0;
@@ -203,6 +224,7 @@ void ADC_Handler()
 	ADC->INTFLAG.bit.WINMON = 1;
 	LowPower.adc_cb();
 }
+#endif
 
 void ArduinoLowPowerClass::wakeOnWire(TwoWire * wire, bool intEnable) {
 	wire->sercom->disableWIRE();

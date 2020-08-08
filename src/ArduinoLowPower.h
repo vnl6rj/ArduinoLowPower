@@ -63,7 +63,7 @@ class ArduinoLowPowerClass {
 		}
 
 		void attachInterruptWakeup(uint32_t pin, voidFuncPtr callback, uint32_t mode);
-		void wakeOnWire(TwoWire * wire, bool intEnable);
+        void wakeOnWire(TwoWire * wire, bool intEnable);
 		void wakeOnSPI(SPIClass * spi, bool intEnable);
 		void wakeOnSerial(Uart * uart, bool intEnable);
 
@@ -85,8 +85,10 @@ class ArduinoLowPowerClass {
 		#endif
 
 		#ifdef ARDUINO_ARCH_SAMD
+		#if (SAMD21)
 		void attachAdcInterrupt(uint32_t pin, voidFuncPtr callback, adc_interrupt mode, uint16_t lo, uint16_t hi);
 		void detachAdcInterrupt();
+		#endif
 		#endif
 
 	private:
