@@ -171,11 +171,33 @@ void ArduinoLowPowerClass::sleep(uint32_t millis) {
 }
 
 void ArduinoLowPowerClass::deepSleep() {
+	#if (SAMR34 || SAML21)
+	PM->SLEEPCFG.reg = PM_SLEEPCFG_SLEEPMODE_BACKUP;
+	SysTick->CTRL &= ~SysTick_CTRL_TICKINT_Msk;
+	__DSB();
+	__WFI();
+	SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk;
+	#elif (SAMD21)
 	sleep();
+	#endif
 }
 
 void ArduinoLowPowerClass::deepSleep(uint32_t millis) {
-	sleep(millis);
+	setAlarmIn(millis);
+	deepSleep();
+}
+
+void ArduinoLowPowerClasS::powerOff() {
+	#if (SAMR34 || SAML21)
+	PM->SLEEPCFG.reg = PM_SLEEPCFG_SLEEPMODE_OFF;
+	SysTick->CTRL &= ~SysTick_CTRL_TICKINT_Msk;
+	__DSB();
+	__WFI();
+	SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk;
+	#elif (SAMD21)
+	// not implemented yet for SAMD21
+	return;
+	#endif
 }
 
 void ArduinoLowPowerClass::setAlarmIn(uint32_t millis) {

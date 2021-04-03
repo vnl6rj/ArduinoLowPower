@@ -59,16 +59,30 @@ class ArduinoLowPowerClass {
 		void deepSleep(void);
 		void deepSleep(uint32_t millis);
 		void deepSleep(int millis) {
-			deepSleep((uint32_t)millis);
+			deepSleep((uint32_t) millis);
 		}
 
-		void attachInterruptWakeup(uint32_t pin, voidFuncPtr callback, uint32_t mode);
+		#if (SAMR34 || SAML21)
+		void backup(void) {
+			deepSleep();
+		}
+		void backup(uint32_t millis) {
+			deepSleep(millis);
+		}
+		void backup(int millis) {
+			deepSleep((uint32_t) millis);
+		}
+
+		void powerOff(void);
+		#endif
+
 		#if (SAMD21)
+		void attachInterruptWakeup(uint32_t pin, voidFuncPtr callback, uint32_t mode);
         void wakeOnWire(TwoWire * wire, bool intEnable);
 		void wakeOnSPI(SPIClass * spi, bool intEnable);
 		void wakeOnSerial(Uart * uart, bool intEnable);
 		#endif
-		
+
 		#ifdef BOARD_HAS_COMPANION_CHIP
 		void companionLowPowerCallback(onOffFuncPtr callback) {
 			companionSleepCB = callback;
