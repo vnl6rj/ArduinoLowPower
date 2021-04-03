@@ -33,7 +33,7 @@ void ArduinoLowPowerClass::idle() {
 	#elif (SAMR34 || SAML21)
 	// disable SysTick interrupt
 	SysTick->CTRL &= ~SysTick_CTRL_TICKINT_Msk;
-    PM->SLEEPCFG.reg = PM_SLEEPCFG_SLEEPMODE_IDLE;
+    PM->SLEEPCFG.reg = PM_SLEEPCFG_SLEEPMODE(0x2);
 	#endif
 	__DSB();
 	__WFI();
@@ -187,7 +187,7 @@ void ArduinoLowPowerClass::deepSleep(uint32_t millis) {
 	deepSleep();
 }
 
-void ArduinoLowPowerClasS::powerOff() {
+void ArduinoLowPowerClass::powerOff() {
 	#if (SAMR34 || SAML21)
 	PM->SLEEPCFG.reg = PM_SLEEPCFG_SLEEPMODE_OFF;
 	SysTick->CTRL &= ~SysTick_CTRL_TICKINT_Msk;
