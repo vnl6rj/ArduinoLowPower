@@ -63,10 +63,12 @@ class ArduinoLowPowerClass {
 		}
 
 		void attachInterruptWakeup(uint32_t pin, voidFuncPtr callback, uint32_t mode);
+		#if (SAMD21)
         void wakeOnWire(TwoWire * wire, bool intEnable);
 		void wakeOnSPI(SPIClass * spi, bool intEnable);
 		void wakeOnSerial(Uart * uart, bool intEnable);
-
+		#endif
+		
 		#ifdef BOARD_HAS_COMPANION_CHIP
 		void companionLowPowerCallback(onOffFuncPtr callback) {
 			companionSleepCB = callback;

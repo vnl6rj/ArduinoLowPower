@@ -30,12 +30,17 @@ void ArduinoLowPowerClass::idle() {
 	SCB->SCR &= ~SCB_SCR_SLEEPDEEP_Msk;
 	#if (SAMD21)
 	PM->SLEEP.reg = 2;
-	#elif (SAMR34)
+	#elif (SAMR34 || SAML21)
+	// disable SysTick interrupt
+	SysTick->CTRL &= ~SysTick_CTRL_TICKINT_Msk;
     PM->SLEEPCFG.reg = PM_SLEEPCFG_SLEEPMODE_IDLE;
 	#endif
 	__DSB();
 	__WFI();
-	
+	#if (SAMR34 || SAML21)
+	// enable SysTick interrupt
+	SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk;
+	#endif
 }
 
 void ArduinoLowPowerClass::idle(uint32_t millis) {
@@ -52,7 +57,7 @@ void ArduinoLowPowerClass::sleep() {
 	__WFI();
 	// Enable systick interrupt
 	SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk;	
-	#elif (SAMR34)
+	#elif (SAMR34 || SAML21)
     GCLK_GENCTRL_Type gclkConfig;
 	gclkConfig.reg = 0;
 	gclkConfig.reg = GCLK->GENCTRL[0].reg;
@@ -211,7 +216,7 @@ void ArduinoLowPowerClass::attachInterruptWakeup(uint32_t pin, voidFuncPtr callb
     #if (SAMD21)
 	// Enable wakeup capability on pin in case being used during sleep
 	EIC->WAKEUP.reg |= (1 << in);
-    #elif (SAMR34)
+    #elif (SAMR34 || SAML21)
     // Enable wakeup capability on pin in case being used during sleep
 	EIC->CTRLA.bit.CKSEL = 1; // use ULP32k as source ( SAML21 is different to D21 series, EIC can be set to use ULP32k without GCLK )
     // Enable EIC
@@ -334,6 +339,8 @@ void ADC_Handler()
 }
 #endif
 
+#if (SAMD21)
+// This does not currently work with SAML21, due to private access to class variables
 void ArduinoLowPowerClass::wakeOnWire(TwoWire * wire, bool intEnable) {
 	wire->sercom->disableWIRE();
 	wire->sercom->sercom->I2CS.CTRLA.bit.RUNSTDBY = intEnable ;
@@ -351,6 +358,7 @@ void ArduinoLowPowerClass::wakeOnSerial(Uart * uart, bool intEnable) {
 	uart->sercom->sercom->USART.CTRLA.bit.RUNSTDBY = intEnable ;
 	uart->sercom->enableUART();
 }
+#endif
 
 ArduinoLowPowerClass LowPower;
 
