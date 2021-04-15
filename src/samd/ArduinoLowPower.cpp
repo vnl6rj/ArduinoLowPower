@@ -449,7 +449,6 @@ void ADC_Handler()
 	LowPower.adc_cb();
 }
 
-#if (SAMD21)
 // This does not currently work with SAML21, due to private access to class variables
 // requires an update to the core: https://github.com/mattairtech/ArduinoCore-samd/commit/25444670383572a3650b2ae55e9942e375975936
 void ArduinoLowPowerClass::wakeOnWire(TwoWire * wire, bool intEnable) {
@@ -469,7 +468,6 @@ void ArduinoLowPowerClass::wakeOnSerial(Uart * uart, bool intEnable) {
 	uart->sercom->sercom->USART.CTRLA.bit.RUNSTDBY = intEnable ;
 	uart->sercom->enableUART();
 }
-#endif
 
 ArduinoLowPowerClass LowPower;
 
