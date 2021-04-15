@@ -21,14 +21,6 @@ For more info, see https://www.arduino.cc/en/Guide/Libraries
 - Support for SAMD21
 - Support SAMR34 and SAML21
 
-### Maintainer
-
-<a href="https://github.com/sponsors/ElectronicCats">
-  <img src="https://electroniccats.com/wp-content/uploads/2020/07/Badge_GHS.png" height="104" />
-</a>
-
-Electronic Cats invests time and resources providing this open source design, please support Electronic Cats and open-source hardware by purchasing products from Electronic Cats!
-
 ### License
 
 GNU LESSER GENERAL PUBLIC LICENSE
