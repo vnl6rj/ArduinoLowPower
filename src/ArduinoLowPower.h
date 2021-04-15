@@ -56,6 +56,18 @@ class ArduinoLowPowerClass {
 			sleep((uint32_t)millis);
 		}
 
+		#if (SAMR34 || SAML21)
+		void standby(void) {
+			sleep();
+		}
+		void standby(uint32_t millis) {
+			sleep(millis);
+		}
+		void standby(int millis) {
+			sleep((uint32_t) millis);
+		}
+		#endif
+
 		void deepSleep(void);
 		void deepSleep(uint32_t millis);
 		void deepSleep(int millis) {
@@ -101,10 +113,8 @@ class ArduinoLowPowerClass {
 		#endif
 
 		#ifdef ARDUINO_ARCH_SAMD
-		#if (SAMD21)
 		void attachAdcInterrupt(uint32_t pin, voidFuncPtr callback, adc_interrupt mode, uint16_t lo, uint16_t hi);
 		void detachAdcInterrupt();
-		#endif
 		#endif
 
 	private:

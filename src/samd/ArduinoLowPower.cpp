@@ -3,9 +3,9 @@
 #include "ArduinoLowPower.h"
 #include "WInterrupts.h"
 
-#if (SAMD21)
 static void configGCLK6()
 {
+	#if (SAMD21)
 	// enable EIC clock
 	GCLK->CLKCTRL.bit.CLKEN = 0; //disable GCLK module
 	while (GCLK->STATUS.bit.SYNCBUSY);
@@ -20,20 +20,27 @@ static void configGCLK6()
 	while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);
 
 	/* Errata: Make sure that the Flash does not power all the way down
-     	* when in sleep mode. */
-
+     * when in sleep mode. */
 	NVMCTRL->CTRLB.bit.SLEEPPRM = NVMCTRL_CTRLB_SLEEPPRM_DISABLED_Val;
+
+	#elif (SAML21 || SAMR34)
+	GCLK->GENCTRL[6].bit.GENEN = 0;
+
+	GCLK->GENCTRL[6].bit.SRC = GCLK_GENCTRL_SRC_OSCULP32K_Val;
+	GCLK->GENCTRL[6].bit.RUNSTDBY = 1;
+	
+	GCLK->GENCTRL[6].bit.GENEN = 1;
+	#endif
 }
-#endif
 
 void ArduinoLowPowerClass::idle() {
 	SCB->SCR &= ~SCB_SCR_SLEEPDEEP_Msk;
 	#if (SAMD21)
 	PM->SLEEP.reg = 2;
 	#elif (SAMR34 || SAML21)
+	PM->SLEEPCFG.reg = PM_SLEEPCFG_SLEEPMODE(0x2);
 	// disable SysTick interrupt
 	SysTick->CTRL &= ~SysTick_CTRL_TICKINT_Msk;
-    PM->SLEEPCFG.reg = PM_SLEEPCFG_SLEEPMODE(0x2);
 	#endif
 	__DSB();
 	__WFI();
@@ -57,6 +64,7 @@ void ArduinoLowPowerClass::sleep() {
 	__WFI();
 	// Enable systick interrupt
 	SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk;	
+
 	#elif (SAMR34 || SAML21)
     GCLK_GENCTRL_Type gclkConfig;
 	gclkConfig.reg = 0;
@@ -110,6 +118,7 @@ void ArduinoLowPowerClass::sleep() {
 	MCLK->CPUDIV.reg = MCLK_CPUDIV_CPUDIV_DIV64; /**(MCLK_CPUDIV) Divide by 64 ,ie run at 62.5kHz */
 	
 	SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
+	PM->SLEEPCFG.reg = PM_SLEEPCFG_SLEEPMODE_STANDBY;
 	__DSB();
 	__WFI();
 	// sleeping here, will wake from here ( except from OFF or Backup modes, those look like POR )
@@ -229,7 +238,6 @@ void ArduinoLowPowerClass::attachInterruptWakeup(uint32_t pin, voidFuncPtr callb
 	if (in == NOT_AN_INTERRUPT || in == EXTERNAL_INT_NMI)
     		return;
 
-	//pinMode(pin, INPUT_PULLUP);
 	attachInterrupt(pin, callback, mode);
     #if (SAMD21)
 	configGCLK6();
@@ -252,30 +260,62 @@ void ArduinoLowPowerClass::attachInterruptWakeup(uint32_t pin, voidFuncPtr callb
 	 #endif
 }
 
-#if (SAMD21)
 void ArduinoLowPowerClass::attachAdcInterrupt(uint32_t pin, voidFuncPtr callback, adc_interrupt mode, uint16_t lo, uint16_t hi)
 {
 	uint8_t winmode = 0;
 
+	#if (SAMD21)
 	switch (mode) {
-		case ADC_INT_BETWEEN:   winmode = ADC_WINCTRL_WINMODE_MODE3; break;
-		case ADC_INT_OUTSIDE:   winmode = ADC_WINCTRL_WINMODE_MODE4; break;
-		case ADC_INT_ABOVE_MIN: winmode = ADC_WINCTRL_WINMODE_MODE1; break;
-		case ADC_INT_BELOW_MAX: winmode = ADC_WINCTRL_WINMODE_MODE2; break;
-		default: return;
+		case ADC_INT_BETWEEN:
+			winmode = ADC_WINCTRL_WINMODE_MODE3;
+			break;
+		case ADC_INT_OUTSIDE:
+			winmode = ADC_WINCTRL_WINMODE_MODE4;
+			break;
+		case ADC_INT_ABOVE_MIN:
+			winmode = ADC_WINCTRL_WINMODE_MODE1;
+			break;
+		case ADC_INT_BELOW_MAX:
+			winmode = ADC_WINCTRL_WINMODE_MODE2;
+			break;
+		default:
+			return;
 	}
+	#elif (SAML21 || SAMR34)
+	switch (mode) {
+		case ADC_INT_BETWEEN:
+			winmode = ADC_CTRLC_WINMODE_MODE3_Val;
+			break;
+		case ADC_INT_OUTSIDE:
+			winmode = ADC_CTRLC_WINMODE_MODE4_Val;
+			break;
+		case ADC_INT_ABOVE_MIN:
+			winmode = ADC_CTRLC_WINMODE_MODE1_Val;
+			break;
+		case ADC_INT_BELOW_MAX:
+			winmode = ADC_CTRLC_WINMODE_MODE2_Val;
+			break;
+		default:
+			return;
+	}
+	#endif
 
 	adc_cb = callback;
 
 	configGCLK6();
-
+	#if (SAMD21)
 	// Configure ADC to use GCLK6 (OSCULP32K)
 	while (GCLK->STATUS.bit.SYNCBUSY) {}
 	GCLK->CLKCTRL.reg = GCLK_CLKCTRL_ID_ADC
 						| GCLK_CLKCTRL_GEN_GCLK6
 						| GCLK_CLKCTRL_CLKEN;
 	while (GCLK->STATUS.bit.SYNCBUSY) {}
+	#elif (SAML21 || SAMD34)
+	GCLK->PCHCTRL[30].bit.GEN = GCLK_PCHCTRL_GEN_GCLK6_Val;
+	GCLK->PCHCTRL[30].bit.CHEN = 1;
+	#endif
 
+	#if (SAMD21)
 	// Set ADC prescaler as low as possible
 	ADC->CTRLB.bit.PRESCALER = ADC_CTRLB_PRESCALER_DIV4;
 	while (ADC->STATUS.bit.SYNCBUSY) {}
@@ -310,6 +350,33 @@ void ArduinoLowPowerClass::attachAdcInterrupt(uint32_t pin, voidFuncPtr callback
 	ADC->SWTRIG.bit.START = 1;
 	while (ADC->STATUS.bit.SYNCBUSY) {}
 
+	#elif (SAML21 || SAMR34)
+	// Set ADC prescaler as low as possible
+	ADC->CTRLB.bit.PRESCALER = ADC_CTRLB_PRESCALER_DIV2;
+
+	// Configure window mode
+	ADC->WINLT.reg = lo;
+	ADC->WINUT.reg = hi;
+	ADC->CTRLC.bit.WINMODE = winmode;
+
+	// Enable window interrupt
+	ADC->INTENSET.bit.WINMON = 1;
+	
+	// Enable ADC in standby mode
+	ADC->CTRLA.bit.RUNSTDBY = 1;
+
+	// Enable continuous conversions
+	ADC->CTRLC.bit.FREERUN = 1;
+
+	// Configure input mux
+	ADC->INPUTCTRL.bit.MUXPOS = g_APinDescription[pin].ulADCChannelNumber;
+
+	// Enable the ADC
+	ADC->CTRLA.bit.ENABLE = 1;
+
+	// Start continuous conversions
+	ADC->SWTRIG.bit.START = 1;
+	#endif
 	// Enable the ADC interrupt
 	NVIC_EnableIRQ(ADC_IRQn);
 }
@@ -319,6 +386,7 @@ void ArduinoLowPowerClass::detachAdcInterrupt()
 	// Disable the ADC interrupt
 	NVIC_DisableIRQ(ADC_IRQn);
 
+	#if (SAMD21)
 	// Disable the ADC
 	ADC->CTRLA.bit.ENABLE = 0;
 	while (ADC->STATUS.bit.SYNCBUSY) {}
@@ -350,6 +418,27 @@ void ArduinoLowPowerClass::detachAdcInterrupt()
 						| GCLK_CLKCTRL_CLKEN;
 	while (GCLK->STATUS.bit.SYNCBUSY) {}
 
+	#elif (SAML21 || SAMR34)
+	// Disable the ADC
+	ADC->CTRLA.bit.ENABLE = 0;
+
+	// Disable contiuous conversions
+	ADC->CTRLC.bit.FREERUN = 0;
+
+	// Disable window interrupt
+	ADC->INTENCLR.bit.WINMON = 0;
+
+	// Disable window mode
+	ADC->CTRLC.bit.WINMODE = ADC_CTRLC_WINMODE_DISABLE_Val;
+
+	// Restore ADC prescaler
+	ADC->CTRLB.bit.PRESCALER = ADC_CTRLB_PRESCALER_DIV256_Val;
+
+	// Restore ADC clock
+	GCLK->PCHCTRL[30].bit.GEN = GCLK_PCHCTRL_GEN_GCLK0_Val;
+	GCLK->PCHCTRL[30].bit.CHEN = 1;
+	#endif
+
 	adc_cb = nullptr;
 }
 
@@ -359,10 +448,10 @@ void ADC_Handler()
 	ADC->INTFLAG.bit.WINMON = 1;
 	LowPower.adc_cb();
 }
-#endif
 
 #if (SAMD21)
 // This does not currently work with SAML21, due to private access to class variables
+// requires an update to the core: https://github.com/mattairtech/ArduinoCore-samd/commit/25444670383572a3650b2ae55e9942e375975936
 void ArduinoLowPowerClass::wakeOnWire(TwoWire * wire, bool intEnable) {
 	wire->sercom->disableWIRE();
 	wire->sercom->sercom->I2CS.CTRLA.bit.RUNSTDBY = intEnable ;
